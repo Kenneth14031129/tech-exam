@@ -134,10 +134,10 @@ You will be assessed based on the sections you complete, with the difficulty lev
      - Known issues or limitations.
 
 3. **Collaborator**:
-   - Add [apquinit](https://github.com/apquinit) as a collaborator to your repository.
+   - Add [apquinit](https://github.com/apquinit) and [beforeoafterm](https://github.com/beforeoafterm) as collaborators to your repository.
 
 4. **Schedule a Review**:
-   - Book an appointment with us to review your submission by scheduling a meeting with Alex on [Calendly](https://calendly.com/apquinit). Include your GitHub repository link and any additional notes or comments.
+   - Book an appointment with us to review your submission by scheduling a meeting with [Alex](https://calendly.com/apquinit/personal-meeting) or [N](https://calendly.com/n-at-ardata/tech-assessment). Include your GitHub repository link and any additional notes or comments.
 
 ---
 
