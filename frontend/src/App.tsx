@@ -1,20 +1,15 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+import { Wallet, Sparkles, Copy, FileText, CheckCircle, AlertCircle, Loader2, Plus, RotateCcw, ExternalLink, Star, Info } from 'lucide-react';
+import { useContract } from './hooks/useContract';
+import { NFT_CONTRACT } from './contracts/config';
+import { transactionService, Transaction } from './services/transactionService';
 
 interface WalletState {
   address: string | null;
   balance: string | null;
   isConnected: boolean;
   error: string | null;
-}
-
-interface Transaction {
-  hash: string;
-  from: string;
-  to: string;
-  value: string;
-  timestamp: number;
-  blockNumber: number;
 }
 
 function App() {
@@ -26,6 +21,11 @@ function App() {
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'wallet' | 'nft'>('wallet');
+  const [mintForm, setMintForm] = useState({ tokenURI: '', isOpen: false });
+  const [apiStatus] = useState(transactionService.getApiStatus());
+
+  const contract = useContract(wallet.address || undefined);
 
   const connectWallet = async () => {
     try {
@@ -55,7 +55,7 @@ function App() {
         error: null,
       });
 
-      await fetchTransactions(address, provider);
+      await fetchTransactions(address);
     } catch (error: any) {
       setWallet(prev => ({
         ...prev,
@@ -66,38 +66,16 @@ function App() {
     }
   };
 
-  const fetchTransactions = async (address: string, provider: ethers.BrowserProvider) => {
+  const fetchTransactions = async (address: string) => {
     try {
-      const currentBlock = await provider.getBlockNumber();
-
-      // For demo purposes, we'll show the last 10 blocks the address was involved in
-      const recentTxs: Transaction[] = [];
-      for (let i = currentBlock; i > currentBlock - 10 && i >= 0; i--) {
-        try {
-          const block = await provider.getBlock(i);
-          if (block && block.transactions.length > 0) {
-            // Get the first transaction from each block for demo
-            const txHash = block.transactions[0];
-            const tx = await provider.getTransaction(txHash);
-            if (tx) {
-              recentTxs.push({
-                hash: tx.hash,
-                from: tx.from,
-                to: tx.to || '',
-                value: ethers.formatEther(tx.value),
-                timestamp: block.timestamp,
-                blockNumber: block.number,
-              });
-            }
-          }
-        } catch (err) {
-          // Skip blocks that can't be fetched
-        }
-      }
-
-      setTransactions(recentTxs.slice(0, 10));
+      setLoading(true);
+      const transactions = await transactionService.fetchTransactionHistory(address, 1, 10);
+      setTransactions(transactions);
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -148,10 +126,10 @@ function App() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-4">
-              Ethereum Wallet
+              Tech Exam DApp
             </h1>
             <p className="text-xl text-indigo-200 font-light">
-              Your Gateway to the Blockchain
+              Complete Web3 Experience - Wallet + NFT Minting
             </p>
           </div>
           
@@ -159,11 +137,9 @@ function App() {
             <div className="max-w-md mx-auto">
               <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl">
                 <div className="text-center">
-                  {/* Wallet icon */}
+                  
                   <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M21 18v1a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1h-9a2 2 0 00-2 2v8a2 2 0 002 2h9zm-9-2V8h10v8H12zm4-2.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/>
-                    </svg>
+                    <Wallet className="w-10 h-10 text-white" />
                   </div>
                   
                   <h2 className="text-2xl font-bold text-white mb-4">
@@ -180,14 +156,12 @@ function App() {
                   >
                     {loading ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <Loader2 className="animate-spin h-5 w-5" />
                         <span>Connecting...</span>
                       </>
                     ) : (
                       <>
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                        </svg>
+                        <Wallet className="w-5 h-5" />
                         <span>Connect Wallet</span>
                       </>
                     )}
@@ -197,16 +171,50 @@ function App() {
             </div>
           ) : (
             <div className="space-y-8">
-              {/* Wallet Info Cards */}
+              {/* Navigation Tabs */}
+              <div className="flex justify-center">
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-2 border border-white/20">
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setActiveTab('wallet')}
+                      className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                        activeTab === 'wallet'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                          : 'text-white/70 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Wallet size={18} />
+                        <span>Wallet</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('nft')}
+                      className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                        activeTab === 'nft'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                          : 'text-white/70 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Sparkles size={18} />
+                        <span>NFT Collection</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {activeTab === 'wallet' && (
+                <>
+                  {/* Wallet Info Cards */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Balance Card */}
                 <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 shadow-2xl">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-white">Account Balance</h3>
                     <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
+                      <CheckCircle className="w-6 h-6 text-white" />
                     </div>
                   </div>
                   <div className="text-4xl font-bold text-white mb-2">
@@ -228,9 +236,7 @@ function App() {
                         title="Copy wallet address to clipboard"
                         aria-label="Copy wallet address to clipboard"
                       >
-                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                        </svg>
+                        <Copy className="w-4 h-4 text-white" />
                       </button>
                       <button
                         onClick={disconnectWallet}
@@ -251,23 +257,41 @@ function App() {
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
-                      </svg>
+                      <FileText className="w-6 h-6 text-white" />
                     </div>
                     <h3 className="text-2xl font-bold text-white">Recent Transactions</h3>
                   </div>
-                  <span className="text-cyan-300 text-sm bg-cyan-500/20 px-3 py-1 rounded-full">
-                    Sample Data
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <Info size={16} className="text-blue-300" />
+                    <span className={`text-sm px-3 py-1 rounded-full ${
+                      apiStatus.configured 
+                        ? 'text-green-300 bg-green-500/20' 
+                        : 'text-yellow-300 bg-yellow-500/20'
+                    }`}>
+                      {apiStatus.configured ? 'Live Data' : 'Sample Data'}
+                    </span>
+                  </div>
                 </div>
+
+                {!apiStatus.configured && (
+                  <div className="mb-6 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4">
+                    <div className="flex items-start space-x-3">
+                      <Info className="w-5 h-5 text-yellow-300 mt-0.5" />
+                      <div className="text-yellow-100">
+                        <p className="font-medium mb-1">Using Sample Transaction Data</p>
+                        <p className="text-sm text-yellow-200/80">
+                          To fetch real transaction history, add your Etherscan API key to the .env file.
+                          Get a free API key at <span className="font-mono bg-yellow-500/20 px-1 rounded">etherscan.io/register</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {transactions.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 mx-auto mb-4 bg-white/10 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-white/50" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
+                      <FileText className="w-8 h-8 text-white/50" />
                     </div>
                     <p className="text-white/60 text-lg">No recent transactions found</p>
                     <p className="text-white/40 text-sm mt-2">Transactions will appear here once available</p>
@@ -293,7 +317,7 @@ function App() {
                               <p className="text-white/80 font-mono text-xs break-all">{tx.hash}</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                               <div className="bg-white/5 rounded-lg p-3">
                                 <p className="text-xs text-gray-400 mb-1">From</p>
                                 <p className="text-white/80 font-mono text-sm">{tx.from.slice(0, 8)}...{tx.from.slice(-6)}</p>
@@ -304,14 +328,26 @@ function App() {
                               </div>
                               <div className="bg-white/5 rounded-lg p-3">
                                 <p className="text-xs text-gray-400 mb-1">Value</p>
-                                <p className="text-emerald-300 font-semibold">{parseFloat(tx.value).toFixed(4)} ETH</p>
+                                <p className="text-emerald-300 font-semibold">{parseFloat(tx.value).toFixed(6)} ETH</p>
                               </div>
+                              {tx.gasPrice && (
+                                <div className="bg-white/5 rounded-lg p-3">
+                                  <p className="text-xs text-gray-400 mb-1">Gas Price</p>
+                                  <p className="text-blue-300 font-medium">{parseFloat(tx.gasPrice).toFixed(2)} Gwei</p>
+                                </div>
+                              )}
                             </div>
                           </div>
                           
                           <div className="text-right ml-6">
-                            <div className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-xs font-medium mb-2">
-                              Confirmed
+                            <div className={`px-3 py-1 rounded-full text-xs font-medium mb-2 ${
+                              tx.status === 'success' 
+                                ? 'bg-green-500/20 text-green-300' 
+                                : tx.status === 'failed'
+                                ? 'bg-red-500/20 text-red-300'
+                                : 'bg-green-500/20 text-green-300'
+                            }`}>
+                              {tx.status === 'success' ? 'Success' : tx.status === 'failed' ? 'Failed' : 'Confirmed'}
                             </div>
                             <p className="text-white/60 text-xs">
                               {new Date(tx.timestamp * 1000).toLocaleDateString('en-US', {
@@ -327,6 +363,17 @@ function App() {
                   </div>
                 )}
               </div>
+                </>
+              )}
+
+              {activeTab === 'nft' && (
+                <NFTSection
+                  contract={contract}
+                  userAddress={wallet.address}
+                  mintForm={mintForm}
+                  setMintForm={setMintForm}
+                />
+              )}
             </div>
           )}
 
@@ -335,9 +382,7 @@ function App() {
               <div className="bg-red-500/10 backdrop-blur-lg border border-red-500/20 text-red-200 px-6 py-4 rounded-2xl shadow-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
+                    <AlertCircle className="w-4 h-4 text-red-400" />
                   </div>
                   <div>
                     <strong className="font-semibold">Connection Error</strong>
@@ -352,5 +397,237 @@ function App() {
     </div>
   );
 }
+
+// NFT Section Component
+interface NFTSectionProps {
+  contract: ReturnType<typeof useContract>;
+  userAddress: string | null;
+  mintForm: { tokenURI: string; isOpen: boolean };
+  setMintForm: (form: { tokenURI: string; isOpen: boolean }) => void;
+}
+
+const NFTSection: React.FC<NFTSectionProps> = ({ contract, userAddress, mintForm, setMintForm }) => {
+  const handleMint = async () => {
+    if (!mintForm.tokenURI.trim()) {
+      alert('Please enter a token URI');
+      return;
+    }
+
+    try {
+      const result = await contract.mintToken(mintForm.tokenURI);
+      alert(`Success! Token minted with ID: ${result.tokenId}\nTransaction: ${result.transactionHash}`);
+      setMintForm({ tokenURI: '', isOpen: false });
+    } catch (error: any) {
+      alert(`Minting failed: ${error.message}`);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Contract Info & Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Contract Statistics */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 shadow-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-white">Contract Stats</h3>
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-pink-500 rounded-xl flex items-center justify-center">
+              <Star className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-white/70">Total Supply</span>
+              <span className="text-white font-semibold">{contract.currentSupply} / {NFT_CONTRACT.maxSupply}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-white/70">Mint Price</span>
+              <span className="text-green-300 font-semibold">{contract.mintPrice} ETH</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-white/70">Your Tokens</span>
+              <span className="text-white font-semibold">{contract.userTokens.length}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-white/70">Contract</span>
+              <button
+                onClick={() => copyToClipboard(NFT_CONTRACT.address)}
+                className="text-indigo-300 hover:text-indigo-200 font-mono text-sm"
+                title="Click to copy contract address"
+              >
+                {NFT_CONTRACT.address.slice(0, 8)}...{NFT_CONTRACT.address.slice(-6)}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mint NFT */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 shadow-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-white">Mint NFT</h3>
+            <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
+              <Plus className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          
+          {!mintForm.isOpen ? (
+            <div className="text-center">
+              <p className="text-white/70 mb-4">
+                Mint your own Tech Exam NFT for {NFT_CONTRACT.mintPrice} ETH
+              </p>
+              <button
+                onClick={() => setMintForm({ ...mintForm, isOpen: true })}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <Sparkles className="w-5 h-5" />
+                  <span>Mint NFT</span>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-white/70 text-sm font-medium mb-2">
+                  Token Metadata URI
+                </label>
+                <input
+                  type="text"
+                  value={mintForm.tokenURI}
+                  onChange={(e) => setMintForm({ ...mintForm, tokenURI: e.target.value })}
+                  placeholder="https://example.com/metadata/1.json"
+                  className="w-full bg-black/20 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:border-indigo-400 focus:outline-none"
+                />
+                <p className="text-white/50 text-xs mt-1">
+                  Enter the metadata URI for your NFT
+                </p>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleMint}
+                  disabled={contract.isLoading || !mintForm.tokenURI.trim()}
+                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-all duration-200"
+                >
+                  {contract.isLoading ? (
+                    <>
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      Minting...
+                    </>
+                  ) : (
+                    `Mint for ${NFT_CONTRACT.mintPrice} ETH`
+                  )}
+                </button>
+                <button
+                  onClick={() => setMintForm({ tokenURI: '', isOpen: false })}
+                  className="px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* NFT Collection */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-white">Your NFT Collection</h3>
+          </div>
+          <button
+            onClick={() => contract.refetch()}
+            className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 hover:text-indigo-200 font-medium py-2 px-4 rounded-lg transition-all duration-200"
+          >
+            <div className="flex items-center space-x-1">
+              <RotateCcw className="w-4 h-4" />
+              <span>Refresh</span>
+            </div>
+          </button>
+        </div>
+
+        {contract.isLoading ? (
+          <div className="text-center py-12">
+            <Loader2 className="animate-spin h-8 w-8 text-white mx-auto mb-4" />
+            <p className="text-white/60">Loading your NFTs...</p>
+          </div>
+        ) : contract.userTokens.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-white/10 rounded-full flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-white/50" />
+            </div>
+            <p className="text-white/60 text-lg mb-2">No NFTs yet</p>
+            <p className="text-white/40 text-sm">Mint your first NFT to get started!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {contract.userTokens.map((token) => (
+              <div key={token.tokenId} className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      #{token.tokenId}
+                    </div>
+                    <div>
+                      <h4 className="text-white font-semibold">Tech Exam NFT</h4>
+                      <p className="text-white/60 text-sm">Token ID: {token.tokenId}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-black/20 rounded-xl p-3 mb-4">
+                  <p className="text-xs text-gray-400 mb-1">Metadata URI</p>
+                  <p className="text-white/80 font-mono text-xs break-all">{token.tokenURI}</p>
+                </div>
+
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => copyToClipboard(token.tokenURI)}
+                    className="flex-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 hover:text-indigo-200 font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <Copy className="w-3 h-3" />
+                      <span>Copy URI</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => window.open(`https://etherscan.io/token/${NFT_CONTRACT.address}?a=${token.tokenId}`, '_blank')}
+                    className="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-300 hover:text-green-200 font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <ExternalLink className="w-3 h-3" />
+                      <span>View</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {contract.error && (
+        <div className="bg-red-500/10 backdrop-blur-lg border border-red-500/20 text-red-200 px-6 py-4 rounded-2xl shadow-lg">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-4 h-4 text-red-400" />
+            </div>
+            <div>
+              <strong className="font-semibold">Smart Contract Error</strong>
+              <p className="text-sm text-red-300 mt-1">{contract.error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default App;
